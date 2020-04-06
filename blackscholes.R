@@ -1,7 +1,35 @@
 # Search for stocks
 # https://finviz.com/screener.ashx?v=111&f=cap_mid
+library(RQuantLib)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+## Calculate historic volatiliy
+spy <- read.table("./historic_data/SPY.csv", check.names=FALSE,  header=TRUE,sep=",")
+
+daily_vol <- spy %>%
+    mutate(P_i=Close/lag(Close))%>%
+    mutate(X_i=log(P_i)) %>%
+    mutate(X = (X_i - mean(X_i, na.rm = TRUE))^2) %>%
+    summarise(sd = sd(X_i,na.rm = TRUE)) 
+
+#252 is the number of trading days in a year
+annual_vol <- daily_vol*sqrt(252)
+
+v_t <- annual_vol * sqrt(23/252)
+#vt <- daily_vol * sqrt(23)
+
+# Probability that spy closes below 300 when current price is at 257
+spy_current <- 257
+pnorm(log(300/spy_current),sd=annual_vol$sd*sqrt(23/252))
+# Probability that spy closes above 300 when current price is at 257
+1-pnorm(log(300/spy_current),sd=annual_vol$sd*sqrt(23/252))
+
+
 
 blackScholesImp <- function(S, k, Tm, r, sigma){
+    
   d1 <- (log(S/k) + (r+(sigma^2)/2)*(Tm))/(sigma*sqrt(Tm))
   d2 <- (log(S/k) + (r-(sigma^2)/2)*(Tm))/(sigma*sqrt(Tm))
   
@@ -82,7 +110,12 @@ call_int <- sapply(int,function(x) {
     black_scholes(2540.21,2525, 19/365,x,0.604)})
 
 
-black_scholes(2540.21,2525, 18/365,0.01,0.64)
+AmericanOption(type, underlying, strike,dividendYield, riskFreeRate, maturity, volatility,timeSteps=150, gridPoints=149, engine="CrankNicolson",discreteDividends, discreteDividendsTimeUntil)
+
+blackScholes(2540.21,2525, 18/365,0.01,0.64)
+EuropeanOption("call", underlying=2540.21, strike=2600, dividendYield=0.00, riskFreeRate = 0.01, maturity = 1/360, volatility = 0.15)
+
+
 black_scholes(2540.21,2545, 18/365,0.01,0.63)
 
 #Calculate Bull Call Price Spread
