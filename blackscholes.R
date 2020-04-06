@@ -1,16 +1,72 @@
 # Search for stocks
 # https://finviz.com/screener.ashx?v=111&f=cap_mid
 
-black_scholes <- function(S, k, Tm, r, sigma){
-  values <- c(1)
+blackScholesImp <- function(S, k, Tm, r, sigma){
   d1 <- (log(S/k) + (r+(sigma^2)/2)*(Tm))/(sigma*sqrt(Tm))
   d2 <- (log(S/k) + (r-(sigma^2)/2)*(Tm))/(sigma*sqrt(Tm))
   
-  values[1] <- S*pnorm(d1) - k*exp(-r*Tm)*pnorm(d2)
-  values[2] <- k*exp(-r*Tm)*pnorm(-d2)- S*pnorm(-d1)
+  call <- S*pnorm(d1) - k*exp(-r*Tm)*pnorm(d2)
+  put <- k*exp(-r*Tm)*pnorm(-d2)- S*pnorm(-d1)
 
-  values
+  return(list("call"=call,"put"=put))
 }
+
+blackScholes <- function(S, k, Tm, r, sigma)
+{
+    sapply(S,function(x) {
+        blackScholesImp(x,k,Tm,r,sigma)})
+}
+
+buyCall <- function(spot, strike, Tm, r, sigma)
+{
+    blackScholes(spot, strike, Tm, r, sigma)[,1]$call
+}
+
+sellCall <- function(spot,strike, Tm,r,sigma)
+{
+   -1 * blackScholes(spot, strike, Tm, r, sigma)[,1]$call
+}
+
+buyPut <- function(spot, strike, Tm, r, sigma)
+{
+    -1*blackScholes(spot, strike, Tm, r, sigma)[,1]$put
+}
+
+sellPut <- function(spot, strike, Tm, r, sigma)
+{
+    blackScholes(spot, strike, Tm, r, sigma)[,1]$put
+}
+
+bullCall <- function(long_strike, short_strike, spot, Tm, r, sigma)
+{
+    spot_range <- seq(long_strike*(1-0.5),short_strike*(1+0.5),0.01)
+
+    long_call <- buyCall(spot,long_strike, Tm,r,sigma)
+    short_call <- sellCall(spot,short_strike,Tm,r,sigma)
+
+    long_profile <- blackScholes(spot_range,long_strike,0,r,sigma)
+    short_profile <- blackScholes(spot_range,short_strike,0,r,sigma)[,1]$call
+
+ #   profile <- long_profile - long_call + short_call + short_profile
+
+
+    list("spotRange" = spot_range,
+         "longCallCost" = long_call,
+         "shotCallCost" = short_call,
+         "profile" = profile,
+         "debit" = long_call + short_call,
+         "long_profile"=long_profile)
+}
+
+spy <- 246.08
+long <- 240
+short <- 250 
+Tm <- 14/365
+r <- 0.01
+sigma <- 0.455
+
+
+bullSpread <- bullCall(long, short, spy, Tm, r, sigma)
 
 spot <- seq(0,300)
 call_sp <- sapply(spot,function(x) {
