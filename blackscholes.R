@@ -36,10 +36,9 @@ pnorm(log(300/spy_current),sd=annual_vol$sd*sqrt(23/252))
 
 BlackScholes <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
 {
-
-    type = match.arg(type)
+    type <- match.arg(type)
     if(is.null(costOfCarry))
-        costOfCarry = riskFreeRate
+        costOfCarry <- riskFreeRate
 
     impl<- function(S, X, T, r, b, sigma)
     {
@@ -67,6 +66,165 @@ BlackScholes <- function(type=c("call", "put"), underlying, strike, maturity, vo
     class(result) <- c("bsoption", "list")
     result
 }
+
+CalculateDelta <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
+    type <- match.arg(type)
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+
+    impl <- function(S, X, T, r, b, sigma) {
+        d1 = (log(S/X) + (b + sigma*sigma/2)*T)/(sigma*sqrt(T))
+        call <- exp((b - r)*T)*pnorm(d1)
+        put <- exp((b - r)*T)*(pnorm(d1) - 1)
+
+        return (list(call=call,put=put))
+    }
+    delta <- impl(underlying,strike,maturity,riskFreeRate,costOfCarry,volatility)
+    if(type == "call")
+        return(delta$call)
+    else
+        return(delta$put)
+}
+
+CalculateGamma <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
+    type = match.arg(type)
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+
+    impl <- function(S, X, T, r, b, sigma) {
+        d1 <- (log(S/X) + (b + sigma*sigma/2)*T)/(sigma*sqrt(T))
+        gamma <- (exp((-d1^2)/2)/sqrt(2*pi))/(S*sigma*sqrt(T))
+    }
+    gamma <- impl(underlying,strike,maturity,riskFreeRate,costOfCarry,volatility)
+    gamma
+}
+
+CalculateTheta <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
+    type = match.arg(type)
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+    
+    impl <- function(S, X, T, r, b, sigma)
+    {
+        d1 <- (log(S/X) + (b + sigma*sigma/2)*T)/(sigma*sqrt(T))
+        d2 <- d1 - sigma*sqrt(T)
+        NDF <- function(x) exp(-x*x/2)/sqrt(8*atan(1))
+    
+        Theta1 <- -(S*exp((b - r)*T)*NDF(d1)*sigma)/(2*sqrt(T))
+
+        call <- Theta1 - (b - r)*S*exp((b - r)*T)*pnorm(+d1) - r*X*exp(-r*T)*pnorm(+d2)
+        put <- Theta1 + (b - r)*S*exp((b - r)*T)* pnorm(-d1) + r*X*exp(-r*T)*pnorm(-d2)
+        return(list(call=call,put=put))
+    }
+    theta <- impl(underlying,strike,maturity,riskFreeRate,costOfCarry,volatility)
+
+    if(type == "call")
+        return(theta$call)
+    else
+        return(theta$put)
+}
+
+CalculateRho <- function(price, type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
+    type = match.arg(type)
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+
+    impl <- function(price, S, X, T, r, b, sigma) {
+        d1 <- (log(S/X) + (b + sigma*sigma/2)*T)/(sigma*sqrt(T))
+        d2 <- d1 - sigma*sqrt(T)
+
+        if (b != 0)
+            call <- T*X*exp(-r*T)*pnorm(d2)
+        else
+            call <- -T*price
+
+        if (b != 0)
+            put <- -T*X*exp(-r*T)*pnorm(-d2)
+        else
+            put <- -T*price
+        return(list(call=call,put=put))
+    }
+    
+    rho <- impl(price,underlying,strike,maturity,riskFreeRate,costOfCarry,volatility)
+
+    if(type == "call")
+        return(rho$call)
+    else
+        return(rho$put)
+}
+
+CalculateVega <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+
+    impl <- function(S, X, T, r, b, sigma)
+    {
+        NDF <- function(x) exp(-x*x/2)/sqrt(8*atan(1))
+        d1 <- (log(S/X) + (b + sigma*sigma/2)*T)/(sigma*sqrt(T))
+        vega <- S*exp((b - r)*T)*NDF(d1)*sqrt(T)
+        vega
+    }
+    vega <- impl(underlying,strike,maturity,riskFreeRate,costOfCarry,volatility)
+    return(vega)
+}
+
+Delta.bsoption <- function(x)
+{
+    do.call(CalculateDelta,x$parameters)
+}
+
+Gamma.bsoption <- function(x)
+{
+    do.call(CalculateGamma,x$parameters)
+}
+
+Theta.bsoption <- function(x)
+{
+    do.call(CalculateTheta,x$parameters)
+}
+
+Vega.bsoption <- function(x)
+{
+    do.call(CalculateVega,x$parameters)
+}
+
+Rho.bsoption <- function(x)
+{
+    params <- x$parameters
+    params[["price"]] <- x$price
+    do.call(CalculateRho,params)
+}
+
+Delta <- function(x)
+{
+    UseMethod("Delta",x)
+}
+
+Gamma <- function(x)
+{
+    UseMethod("Gamma",x)
+}
+
+Theta <- function(x)
+{
+    UseMethod("Theta",x)
+}
+
+Vega <- function(x)
+{
+    UseMethod("Vega",x)
+}
+
+Rho <- function(x)
+{
+    UseMethod("Rho",x)
+}
+    
 
 blackScholesImp <- function(S, k, Tm, r, sigma){
     
@@ -166,14 +324,30 @@ theta <- function(TypeFlag, S, X, Time, r, b, sigma)
 
 EuropeanOption("put", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.10, maturity = 39/365, volatility = 0.40)
 
-EuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
+EuropeanOption("call", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.10, maturity = 39/365, volatility = 0.40)
+
+xoEuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
 
 blackScholes(259.39, 263, 39/365,0.10,0.40)
 
 bs <- BlackScholes(type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
-do.call(BlackScholes,bs$parameters)
+Delta(bs)
+Theta(bs)
+Vega(bs)
+Rho(bs)
+Gamma(bs)
 
+bs <- BlackScholes(type="put", underlying = 258.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+
+bs <- BlackScholes(type="call", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+Delta(bs)
+Theta(bs)/365
+Vega(bs)
+Rho(bs)
+Gamma(bs)
+
+do.call(BlackScholes,bs$parameters)
 theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)
 theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)/365
 
@@ -181,7 +355,7 @@ theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)/365
 GBSOption(TypeFlag = "c", S = 259.39, X =263, Time = 39/365, r = 0.10, sigma = 0.40,b=0.10)
 sapply(c('delta', 'gamma', 'vega', 'theta', 'rho'), function(greek) 
    GBSGreeks(Selection = greek, TypeFlag = "c", S = 259.39, X = 263, 
-             Time = 39/365, r = 0.00, b = 0.00, sigma = 0.40))
+             Time = 39/365, r = 0.10, b = 0.10, sigma = 0.40))
 
 black_scholes(2540.21,2545, 18/252,0.01,0.63)
 
