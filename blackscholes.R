@@ -4,8 +4,14 @@ library(RQuantLib)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(fOptions)
+library(quantmod)
+
+# Calculate black scholes
+#https://www.rmetrics.org/downloads/9783906041025-basicr.pdf
 
 ## Calculate historic volatiliy
+
 spy <- read.table("./historic_data/SPY.csv", check.names=FALSE,  header=TRUE,sep=",")
 
 daily_vol <- spy %>%
@@ -110,13 +116,35 @@ call_int <- sapply(int,function(x) {
     black_scholes(2540.21,2525, 19/365,x,0.604)})
 
 
-AmericanOption(type, underlying, strike,dividendYield, riskFreeRate, maturity, volatility,timeSteps=150, gridPoints=149, engine="CrankNicolson",discreteDividends, discreteDividendsTimeUntil)
+theta <- function(TypeFlag, S, X, Time, r, b, sigma)
+{
+    d1 = (log(S/X) + (b + sigma*sigma/2)*Time)/(sigma*sqrt(Time))
+    d2 = d1 - sigma*sqrt(Time)
+    NDF <- function(x) exp(-x*x/2)/sqrt(8*atan(1))
+    
+    Theta1 = -(S*exp((b - r)*Time)*NDF(d1)*sigma)/(2*sqrt(Time))
+    if (TypeFlag == "c")
+        theta = Theta1 - (b - r)*S*exp((b - r)*Time)*pnorm(+d1) - r*X*exp(-r*Time)*pnorm(+d2)
+    else if (TypeFlag == "p")
+        theta = Theta1 + (b - r)*S*exp((b - r)*Time)* pnorm(-d1) + r*X*exp(-r*Time)*pnorm(-d2)
+    theta
+}
 
-blackScholes(2540.21,2525, 18/365,0.01,0.64)
-EuropeanOption("call", underlying=2540.21, strike=2600, dividendYield=0.00, riskFreeRate = 0.01, maturity = 1/360, volatility = 0.15)
+EuropeanOption("call", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.00, maturity = 39/365, volatility = 0.40)
+
+EuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
+
+blackScholes(259.39, 263, 39/365,0.00,0.40)
+theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)
+theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)/365
 
 
-black_scholes(2540.21,2545, 18/365,0.01,0.63)
+GBSOption(TypeFlag = "c", S = 259.39, X =263, Time = 39/365, r = 0.00, sigma = 0.40,b=0)
+sapply(c('delta', 'gamma', 'vega', 'theta', 'rho'), function(greek) 
+   GBSGreeks(Selection = greek, TypeFlag = "c", S = 259.39, X = 263, 
+             Time = 39/365, r = 0.00, b = 0.00, sigma = 0.40))
+
+black_scholes(2540.21,2545, 18/252,0.01,0.63)
 
 #Calculate Bull Call Price Spread
 
@@ -149,3 +177,7 @@ plot(int,call_int[1,])
 
 plot(vol,call_vol[1,])
 
+
+bla <- getSymbols("AAPL",src="yahoo")
+
+getSymbols("AAPL", from='2000-01-01',to='2015-09-25')
