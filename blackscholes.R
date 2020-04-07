@@ -3,6 +3,7 @@
 # https://quant.stackexchange.com/questions/7761/a-simple-formula-for-calculating-implied-volatility
 # https://www.rmetrics.org/downloads/9783906041025-basicr.pdf
 library(RQuantLib)
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
@@ -65,6 +66,37 @@ BlackScholes <- function(type=c("call", "put"), underlying, strike, maturity, vo
     result <- list(parameters=param, price=if(type == "call") bs$call else bs$put)
     class(result) <- c("bsoption", "list")
     result
+}
+
+    
+BlackScholesPriceArray <- function(type=c("call", "put"), underlaying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL)
+{
+    type <- match.arg(type)
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+
+    Flatten <- function(option)
+    {
+        list(underlying=option$parameters$underlying,
+             type=option$parameter$type,
+             strike=option$parameters$strike,
+             maturity=option$parameters$maturity,
+             volatility=option$parameters$volatility,
+             riskFreeRate=option$parameters$riskFreeRate,
+             costOfCarry=option$parameters$costOfCarry,
+             price=option$price,
+             delta=option$greeks$delta,
+             gamma=option$greeks$gamma,
+             theta=option$greeks$theta,
+             vega=option$greeks$vega)
+    }
+
+    result <- lapply(underlaying,function(x) {
+        bs <-  BlackScholes(type=c("call", "put"), x, strike, maturity, volatility, riskFreeRate, costOfCarry)
+        bs[["greeks"]] <- Greeks(bs)
+        return(Flatten(bs))
+    })
+    return(as.data.frame(do.call(rbind.data.frame,bss)))
 }
 
 CalculateDelta <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
@@ -200,6 +232,15 @@ Rho.bsoption <- function(x)
     do.call(CalculateRho,params)
 }
 
+Greeks.bsoption <- function(x)
+{
+    list(delta=Delta(x),
+         gamma=Gamma(x),
+         theta=Theta(x)/365,
+         vega=Vega(x)/100,
+         Rho=Rho(x)/100)
+}
+
 Delta <- function(x)
 {
     UseMethod("Delta",x)
@@ -224,67 +265,52 @@ Rho <- function(x)
 {
     UseMethod("Rho",x)
 }
+
+Greeks <- function(x)
+{
+    UseMethod("Greeks",x)
+}
+
+Order <- function(operation=c("sell","buy"),type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
+    type <- match.arg(type)
+    operation <- match.arg(operation)
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+    if(operation == "sell")
+    {
+        bs <- BlackScholes(type,underlying, strike, maturity, volatility, riskFreeRate, costOfCarry)
+        bs$price <- bs$price * -1
+        return(bs)
+    }
+    else
+    {
+        return(BlackScholes(type,underlying, strike, maturity, volatility, riskFreeRate, costOfCarry))
+    }
+}        
+
+BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, riskFreeRate, costOfCarry=NULL)
+{
+    spotRange <- seq(shortStrike*(1-0.5),longStrike*(1+0.5),0.1)
+
+    longPut <- Order(operation="buy", type="put", underlying, longStrike, maturity, volatility, riskFreeRate, costOfCarry)
+    shortPut <- Order(operation="sell", type="put", underlying, shortStrike, maturity, volatility, riskFreeRate, costOfCarry)
+
+    shortArray <- BlackScholesPriceArray(type="put", underlaying = spotRange, strike = shortStrike, maturity, volatility, riskFreeRate)
+
+    longArray <- BlackScholesPriceArray(type="put", underlaying = spotRange, strike = longStrike, maturity, volatility, riskFreeRate)
     
 
-blackScholesImp <- function(S, k, Tm, r, sigma){
-    
-  d1 <- (log(S/k) + (r+(sigma^2)/2)*(Tm))/(sigma*sqrt(Tm))
-  d2 <- (log(S/k) + (r-(sigma^2)/2)*(Tm))/(sigma*sqrt(Tm))
-  
-  call <- S*pnorm(d1) - k*exp(-r*Tm)*pnorm(d2)
-  put <- k*exp(-r*Tm)*pnorm(-d2)- S*pnorm(-d1)
+    #profile <- longArray$price - longPut$price + shortArray$price + shortPut$price
 
-  return(list("call"=call,"put"=put))
+    list("spotRange" = spotRange,
+         "longPut" = longPut,
+         "shortPut" = shortPut)
+   #      "profile" = profile,
+  #       "debit" = longPut$price + shortPut$price)
 }
 
-blackScholes <- function(S, k, Tm, r, sigma)
-{
-    sapply(S,function(x) {
-        blackScholesImp(x,k,Tm,r,sigma)})
-}
-
-buyCall <- function(spot, strike, Tm, r, sigma)
-{
-    blackScholes(spot, strike, Tm, r, sigma)[,1]$call
-}
-
-sellCall <- function(spot,strike, Tm,r,sigma)
-{
-   -1 * blackScholes(spot, strike, Tm, r, sigma)[,1]$call
-}
-
-buyPut <- function(spot, strike, Tm, r, sigma)
-{
-    -1*blackScholes(spot, strike, Tm, r, sigma)[,1]$put
-}
-
-sellPut <- function(spot, strike, Tm, r, sigma)
-{
-    blackScholes(spot, strike, Tm, r, sigma)[,1]$put
-}
-
-bullCall <- function(long_strike, short_strike, spot, Tm, r, sigma)
-{
-    spot_range <- seq(long_strike*(1-0.5),short_strike*(1+0.5),0.01)
-
-    long_call <- buyCall(spot,long_strike, Tm,r,sigma)
-    short_call <- sellCall(spot,short_strike,Tm,r,sigma)
-
-    long_profile <- blackScholes(spot_range,long_strike,0,r,sigma)
-    short_profile <- blackScholes(spot_range,short_strike,0,r,sigma)[,1]$call
-
- #   profile <- long_profile - long_call + short_call + short_profile
-
-
-    list("spotRange" = spot_range,
-         "longCallCost" = long_call,
-         "shotCallCost" = short_call,
-         "profile" = profile,
-         "debit" = long_call + short_call,
-         "long_profile"=long_profile)
-}
-
-spy <- 246.08
+xospy <- 246.08
 long <- 240
 short <- 250 
 Tm <- 14/365
@@ -330,13 +356,19 @@ xoEuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=2
 
 blackScholes(259.39, 263, 39/365,0.10,0.40)
 
+Order(operation="sell",type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+
 bs <- BlackScholes(type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+
+bss <- BlackScholesPriceArray(type="put", seq(230,270,1), strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
 Delta(bs)
 Theta(bs)
 Vega(bs)
 Rho(bs)
 Gamma(bs)
+
+Greeks(bs)
 
 bs <- BlackScholes(type="put", underlying = 258.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
