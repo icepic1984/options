@@ -1,5 +1,7 @@
 # Search for stocks
 # https://finviz.com/screener.ashx?v=111&f=cap_mid
+# https://quant.stackexchange.com/questions/7761/a-simple-formula-for-calculating-implied-volatility
+# https://www.rmetrics.org/downloads/9783906041025-basicr.pdf
 library(RQuantLib)
 library(dplyr)
 library(tidyr)
@@ -32,7 +34,39 @@ pnorm(log(300/spy_current),sd=annual_vol$sd*sqrt(23/252))
 # Probability that spy closes above 300 when current price is at 257
 1-pnorm(log(300/spy_current),sd=annual_vol$sd*sqrt(23/252))
 
+BlackScholes <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
+{
 
+    type = match.arg(type)
+    if(is.null(costOfCarry))
+        costOfCarry = riskFreeRate
+
+    impl<- function(S, X, T, r, b, sigma)
+    {
+
+        d1 <- ( log(S/X) + (b+sigma*sigma/2)*T ) / (sigma*sqrt(T))
+        d2 <- d1 - sigma*sqrt(T)
+        call <- S*exp((b-r)*T)*pnorm(d1) - X*exp(-r*T)*pnorm(d2)
+        put <- X*exp(-r*T)*pnorm(-d2) - S*exp((b-r)*T)*pnorm(-d1)
+        return(list(call=call, put=put))
+    }
+    
+    bs <- impl(underlying,strike,maturity,riskFreeRate,costOfCarry,volatility)
+
+    param <- list(type=type,
+                  underlying=underlying,
+                  strike=strike,
+                  maturity=maturity,
+                  volatility=volatility,
+                  riskFreeRate=riskFreeRate,
+                  costOfCarry=costOfCarry)
+
+
+    result = list();
+    result <- list(parameters=param, price=if(type == "call") bs$call else bs$put)
+    class(result) <- c("bsoption", "list")
+    result
+}
 
 blackScholesImp <- function(S, k, Tm, r, sigma){
     
@@ -130,21 +164,28 @@ theta <- function(TypeFlag, S, X, Time, r, b, sigma)
     theta
 }
 
-EuropeanOption("call", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.00, maturity = 39/365, volatility = 0.40)
+EuropeanOption("put", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.10, maturity = 39/365, volatility = 0.40)
 
 EuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
 
-blackScholes(259.39, 263, 39/365,0.00,0.40)
+blackScholes(259.39, 263, 39/365,0.10,0.40)
+
+bs <- BlackScholes(type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+
+do.call(BlackScholes,bs$parameters)
+
 theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)
 theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)/365
 
 
-GBSOption(TypeFlag = "c", S = 259.39, X =263, Time = 39/365, r = 0.00, sigma = 0.40,b=0)
+GBSOption(TypeFlag = "c", S = 259.39, X =263, Time = 39/365, r = 0.10, sigma = 0.40,b=0.10)
 sapply(c('delta', 'gamma', 'vega', 'theta', 'rho'), function(greek) 
    GBSGreeks(Selection = greek, TypeFlag = "c", S = 259.39, X = 263, 
              Time = 39/365, r = 0.00, b = 0.00, sigma = 0.40))
 
 black_scholes(2540.21,2545, 18/252,0.01,0.63)
+
+
 
 #Calculate Bull Call Price Spread
 
