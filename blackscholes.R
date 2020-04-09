@@ -69,37 +69,6 @@ BlackScholes <- function(type=c("call", "put"), underlying, strike, maturity, vo
     result
 }
 
-    
-BlackScholesPriceArray <- function(type=c("call", "put"), underlaying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL)
-{
-    type <- match.arg(type)
-    if(is.null(costOfCarry))
-        costOfCarry <- riskFreeRate
-
-    Flatten <- function(option)
-    {
-        list(underlying=option$parameters$underlying,
-             type=option$parameter$type,
-             strike=option$parameters$strike,
-             maturity=option$parameters$maturity,
-             volatility=option$parameters$volatility,
-             riskFreeRate=option$parameters$riskFreeRate,
-             costOfCarry=option$parameters$costOfCarry,
-             price=option$price,
-             delta=option$greeks$delta,
-             gamma=option$greeks$gamma,
-             theta=option$greeks$theta,
-             vega=option$greeks$vega)
-    }
-
-    result <- lapply(underlaying,function(x) {
-        bs <-  BlackScholes(type=c("call", "put"), x, strike, maturity, volatility, riskFreeRate, costOfCarry)
-        bs[["greeks"]] <- Greeks(bs)
-        return(Flatten(bs))
-    })
-    return(as.data.frame(do.call(rbind.data.frame,result)))
-}
-
 BlackScholesArray <- function(type, underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL)
 {
     if(is.null(costOfCarry))
@@ -381,7 +350,11 @@ xoEuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=2
 
 blackScholes(259.39, 263, 39/365,0.10,0.40)
 
-plot_mean <- ggplot(bss, aes(x = underlying, y = price)) +
+bs <- BlackScholesArray("call", seq(200,300,0.1),270.00, maturity = seq(0/365,39/365,1/365), volatility = 0.40, riskFreeRate = 0.10)
+
+bs$maturity <- bs$maturity * 365
+
+plot_mean <- ggplot(bs, aes(x = underlying, y = price)) +
     geom_line(aes(color=factor(maturity))) 
 
 
