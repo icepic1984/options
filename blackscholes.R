@@ -9,6 +9,7 @@ library(tidyr)
 library(ggplot2)
 library(fOptions)
 library(quantmod)
+require(utils)
 
 # Calculate black scholes
 #https://www.rmetrics.org/downloads/9783906041025-basicr.pdf
@@ -96,8 +97,32 @@ BlackScholesPriceArray <- function(type=c("call", "put"), underlaying, strike, m
         bs[["greeks"]] <- Greeks(bs)
         return(Flatten(bs))
     })
-    return(as.data.frame(do.call(rbind.data.frame,bss)))
+    return(as.data.frame(do.call(rbind.data.frame,result)))
 }
+
+BlackScholesArray <- function(type, underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL)
+{
+    if(is.null(costOfCarry))
+        costOfCarry <- riskFreeRate
+
+    df <- expand.grid(type=type,
+                      underlying=underlying,
+                      strike=strike,
+                      maturity=maturity,
+                      volatility=volatility,
+                      riskFreeRate=riskFreeRate,
+                      costOfCarry=costOfCarry,
+                      stringsAsFactors = FALSE)
+
+    result <- mapply(function(type, underlying, strike, maturity, volatility, riskFreeRate, costOfCarry) {
+        bs <- BlackScholes(type, underlying, strike, maturity, volatility, riskFreeRate, costOfCarry)
+        g <- Greeks(bs)
+        c(price=bs$price, delta=g$delta, gamma=g$gamma, theta=g$theta)
+    },
+    df$type, df$underlying,df$strike,df$maturity,df$volatility,df$riskFreeRate,df$costOfCarry)
+    cbind(df,as.data.frame(t(result)))
+}
+
 
 CalculateDelta <- function(type=c("call", "put"), underlying, strike, maturity, volatility, riskFreeRate, costOfCarry=NULL )
 {
@@ -303,9 +328,9 @@ BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, r
 
     #profile <- longArray$price - longPut$price + shortArray$price + shortPut$price
 
-    list("spotRange" = spotRange,
-         "longPut" = longPut,
-         "shortPut" = shortPut)
+    ## list("spotRange" = spotRange,
+    ##      "longPut" = longPut,
+    ##      "shortPut" = shortPut)
    #      "profile" = profile,
   #       "debit" = longPut$price + shortPut$price)
 }
@@ -355,6 +380,11 @@ EuropeanOption("call", underlying=259.39, strike=263, dividendYield=0.0, riskFre
 xoEuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
 
 blackScholes(259.39, 263, 39/365,0.10,0.40)
+
+plot_mean <- ggplot(bss, aes(x = underlying, y = price)) +
+    geom_line(aes(color=factor(maturity))) 
+
+
 
 Order(operation="sell",type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
