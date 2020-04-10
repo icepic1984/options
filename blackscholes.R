@@ -304,6 +304,7 @@ BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, r
           "longPut" = longPut,
           "shortPut" = shortPut,
           "profile" = longArray,
+          "breakEven" = min(shortStrike,longStrike) + max(longPut$price, shortPut$price) - min(longPut$price,shortPut$price),
           "debit" = longPut$price - shortPut$price)
 }
 
