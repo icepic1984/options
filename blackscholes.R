@@ -308,135 +308,31 @@ BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, r
           "debit" = longPut$price - shortPut$price)
 }
 
-xospy <- 246.08
-long <- 240
-short <- 250 
-Tm <- 14/365
-r <- 0.01
-sigma <- 0.455
-
-
-bullSpread <- bullCall(long, short, spy, Tm, r, sigma)
-
-spot <- seq(0,300)
-call_sp <- sapply(spot,function(x) {
-    black_scholes(x,250,1,.03,0.15)})
-
-vol <- seq(0,1,0.01)
-call_vol <- sapply(vol,function(x) {
-    black_scholes(2540.21,2525, 18/365,0.01,x)})
-
-
-int <- seq(0,1,0.01)
-call_int <- sapply(int,function(x) {
-    black_scholes(2540.21,2525, 19/365,x,0.604)})
-
-
-theta <- function(TypeFlag, S, X, Time, r, b, sigma)
-{
-    d1 = (log(S/X) + (b + sigma*sigma/2)*Time)/(sigma*sqrt(Time))
-    d2 = d1 - sigma*sqrt(Time)
-    NDF <- function(x) exp(-x*x/2)/sqrt(8*atan(1))
-    
-    Theta1 = -(S*exp((b - r)*Time)*NDF(d1)*sigma)/(2*sqrt(Time))
-    if (TypeFlag == "c")
-        theta = Theta1 - (b - r)*S*exp((b - r)*Time)*pnorm(+d1) - r*X*exp(-r*Time)*pnorm(+d2)
-    else if (TypeFlag == "p")
-        theta = Theta1 + (b - r)*S*exp((b - r)*Time)* pnorm(-d1) + r*X*exp(-r*Time)*pnorm(-d2)
-    theta
-}
 
 EuropeanOption("put", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.10, maturity = 39/365, volatility = 0.40)
-
 EuropeanOption("call", underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate = 0.10, maturity = 39/365, volatility = 0.40)
+EuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
+GBSOption(TypeFlag = "c", S = 259.39, X =263, Time = 39/365, r = 0.10, sigma = 0.40,b=0.10)
+sapply(c('delta', 'gamma', 'vega', 'theta', 'rho'), function(greek) 
+   GBSGreeks(Selection = greek, TypeFlag = "c", S = 259.39, X = 263, 
+             Time = 39/365, r = 0.10, b = 0.10, sigma = 0.40))
 
-xoEuropeanOptionImpliedVolatility("call", value=5.58,underlying=259.39, strike=263, dividendYield=0.0, riskFreeRate=0.0, maturity=39/360,volatility=0.10)
-
-blackScholes(259.39, 263, 39/365,0.10,0.40)
-
+bs <- Order(operation="sell",type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 bs <- BlackScholesArray("call", seq(200,300,0.1),270.00, maturity = seq(0/365,39/365,1/365), volatility = 0.40, riskFreeRate = 0.10)
-
-bs$maturity <- bs$maturity * 365
-
-plot_mean <- ggplot(bs, aes(x = underlying, y = price)) +
-    geom_line(aes(color=factor(maturity))) 
-
-
-
-Order(operation="sell",type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
-
 bs <- BlackScholes(type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
-
-bss <- BlackScholesPriceArray(type="put", seq(230,270,1), strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
-
-b <- BearPut(267,266,273,39/365,0.40,0.10)
-plot_mean <- ggplot(b$profile, aes(x = underlying, y = price)) +
-    geom_line(aes(color=factor(maturity),linetype=factor(volatility))) 
-
+bs <- BlackScholes(type="put", underlying = 258.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+bs <- BlackScholes(type="call", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
 Delta(bs)
 Theta(bs)
 Vega(bs)
 Rho(bs)
 Gamma(bs)
-
 Greeks(bs)
 
-bs <- BlackScholes(type="put", underlying = 258.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
-bs <- BlackScholes(type="call", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
-Delta(bs)
-Theta(bs)/365
-Vega(bs)
-Rho(bs)
-Gamma(bs)
-
-do.call(BlackScholes,bs$parameters)
-theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)
-theta("c",S=259.39,X=263,Time=39/365,r=0.00,b=0.0,sigma=0.40)/365
+b <- BearPut(267,266,273,39/365,0.40,0.10)
+plot_mean <- ggplot(b$profile, aes(x = underlying, y = price)) +
+    geom_line(aes(color=factor(maturity),linetype=factor(volatility)))
 
 
-GBSOption(TypeFlag = "c", S = 259.39, X =263, Time = 39/365, r = 0.10, sigma = 0.40,b=0.10)
-sapply(c('delta', 'gamma', 'vega', 'theta', 'rho'), function(greek) 
-   GBSGreeks(Selection = greek, TypeFlag = "c", S = 259.39, X = 263, 
-             Time = 39/365, r = 0.10, b = 0.10, sigma = 0.40))
-
-black_scholes(2540.21,2545, 18/252,0.01,0.63)
-
-
-
-#Calculate Bull Call Price Spread
-
-# Parameters
-spot_range <-seq(2500,2600,1)
-long_strike <- 2545
-short_strike <- 2580
-multiplicator <- 100
-spot <- 2540.21
-
-long_call <- sapply(spot_range,function(x) {
-    black_scholes(x,long_strike, 0/365,0.01,0.64)}) * multiplicator
-
-short_call <- sapply(spot_range,function(x) {
-    black_scholes(x,short_strike, 0/365,0.01,0.64)}) * multiplicator
-
-long_call_buyin <- black_scholes(spot,long_strike, 18/365,0.01,0.64) * multiplicator
-short_call_buyin <- black_scholes(spot,short_strike, 18/365,0.01,0.64) * multiplicator
-
-price <- long_call_buyin - short_call_buyin
-
-plot(spot_range,long_call[1,]
-     -long_call_buyin[1] +
-     (-1*short_call[1,])+
-     short_call_buyin[1], type="l")
-
-plot(spot,call_sp[1,])
-
-plot(int,call_int[1,])
-
-plot(vol,call_vol[1,])
-
-
-bla <- getSymbols("AAPL",src="yahoo")
-
-getSymbols("AAPL", from='2000-01-01',to='2015-09-25')
