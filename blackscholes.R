@@ -290,8 +290,8 @@ BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, r
     longPut <- BlackScholesArray(type="put", underlying, longStrike, maturity, volatility, riskFreeRate, costOfCarry)
     shortPut <- BlackScholesArray(type="put", underlying, shortStrike, maturity, volatility, riskFreeRate, costOfCarry)
 
-    shortArray <- BlackScholesArray(type="put", underlying = spotRange, strike = shortStrike, c(0.01/365,1/365,5/365,10/365), volatility, riskFreeRate)
-    longArray <- BlackScholesArray(type="put", underlying = spotRange, strike = longStrike,  c(0.01/365,1/365,5/365,10/365), volatility, riskFreeRate)
+    shortArray <- BlackScholesArray(type="put", underlying = spotRange, strike = shortStrike, c(0.01/365,1/365,5/365,10/365), c(0.05,0.10,0.20,0.40), riskFreeRate)
+    longArray <- BlackScholesArray(type="put", underlying = spotRange, strike = longStrike,  c(0.01/365,1/365,5/365,10/365), c(0.05,0.10,0.20,0.40), riskFreeRate)
 
     longArray$price <- longArray$price - longPut$price
     shortArray$price <- shortArray$price - shortPut$price
@@ -371,7 +371,7 @@ bss <- BlackScholesPriceArray(type="put", seq(230,270,1), strike = 263, maturity
 
 b <- BearPut(267,266,273,39/365,0.40,0.10)
 plot_mean <- ggplot(b$profile, aes(x = underlying, y = price)) +
-    geom_line(aes(color=factor(maturity))) 
+    geom_line(aes(color=factor(maturity),linetype=factor(volatility))) 
 
 
 Delta(bs)
