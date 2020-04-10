@@ -285,23 +285,26 @@ Order <- function(operation=c("sell","buy"),type=c("call", "put"), underlying, s
 
 BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, riskFreeRate, costOfCarry=NULL)
 {
-    spotRange <- seq(shortStrike*(1-0.5),longStrike*(1+0.5),0.1)
+    spotRange <- seq(shortStrike*(1-0.05),longStrike*(1+0.05),0.1)
 
-    longPut <- Order(operation="buy", type="put", underlying, longStrike, maturity, volatility, riskFreeRate, costOfCarry)
-    shortPut <- Order(operation="sell", type="put", underlying, shortStrike, maturity, volatility, riskFreeRate, costOfCarry)
+    longPut <- BlackScholesArray(type="put", underlying, longStrike, maturity, volatility, riskFreeRate, costOfCarry)
+    shortPut <- BlackScholesArray(type="put", underlying, shortStrike, maturity, volatility, riskFreeRate, costOfCarry)
 
-    shortArray <- BlackScholesPriceArray(type="put", underlaying = spotRange, strike = shortStrike, maturity, volatility, riskFreeRate)
+    shortArray <- BlackScholesArray(type="put", underlying = spotRange, strike = shortStrike, c(0.01/365,1/365,5/365,10/365), volatility, riskFreeRate)
+    longArray <- BlackScholesArray(type="put", underlying = spotRange, strike = longStrike,  c(0.01/365,1/365,5/365,10/365), volatility, riskFreeRate)
 
-    longArray <- BlackScholesPriceArray(type="put", underlaying = spotRange, strike = longStrike, maturity, volatility, riskFreeRate)
-    
+    longArray$price <- longArray$price - longPut$price
+    shortArray$price <- shortArray$price - shortPut$price
 
-    #profile <- longArray$price - longPut$price + shortArray$price + shortPut$price
+    longArray$price <- longArray$price - shortArray$price
 
-    ## list("spotRange" = spotRange,
-    ##      "longPut" = longPut,
-    ##      "shortPut" = shortPut)
-   #      "profile" = profile,
-  #       "debit" = longPut$price + shortPut$price)
+    #profile <- longArray$price - longPut$price - shortArray$price + shortPut$price
+
+     list("spotRange" = spotRange,
+          "longPut" = longPut,
+          "shortPut" = shortPut,
+          "profile" = longArray,
+          "debit" = longPut$price - shortPut$price)
 }
 
 xospy <- 246.08
@@ -364,6 +367,11 @@ Order(operation="sell",type="put", underlying = 259.39, strike = 263, maturity =
 bs <- BlackScholes(type="put", underlying = 259.39, strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
 
 bss <- BlackScholesPriceArray(type="put", seq(230,270,1), strike = 263, maturity = 39/365, volatility = 0.40, riskFreeRate = 0.10)
+
+b <- BearPut(267,266,273,39/365,0.40,0.10)
+plot_mean <- ggplot(b$profile, aes(x = underlying, y = price)) +
+    geom_line(aes(color=factor(maturity))) 
+
 
 Delta(bs)
 Theta(bs)
