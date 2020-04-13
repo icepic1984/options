@@ -285,7 +285,7 @@ Order <- function(operation=c("sell","buy"),type=c("call", "put"), underlying, s
 
 BearPut <- function(longStrike, shortStrike, underlying, maturity, volatility, riskFreeRate, costOfCarry=NULL)
 {
-    spotRange <- seq(shortStrike*(1-0.05),longStrike*(1+0.05),0.1)
+    spotRange <- seq(shortStrike*(1-0.01),longStrike*(1+0.01),0.1)
 
     longPut <- BlackScholesArray(type="put", underlying, longStrike, maturity, volatility, riskFreeRate, costOfCarry)
     shortPut <- BlackScholesArray(type="put", underlying, shortStrike, maturity, volatility, riskFreeRate, costOfCarry)
