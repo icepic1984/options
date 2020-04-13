@@ -331,8 +331,15 @@ Gamma(bs)
 Greeks(bs)
 
 
-b <- BearPut(267,266,273,39/365,0.40,0.10)
+start <- as.POSIXct.Date(Sys.Date())
+end <- as.POSIXct(strptime("05/15/2020", format="%m/%d/%y"))
+as.numeric(end-start)
+
+
+b <- BearPut(267,266,273.53,31/365,0.40,0.01)
+
 plot_mean <- ggplot(b$profile, aes(x = underlying, y = price)) +
     geom_line(aes(color=factor(maturity),linetype=factor(volatility)))
 
+plot_mean
 
